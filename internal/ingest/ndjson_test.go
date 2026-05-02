@@ -1,10 +1,11 @@
-package ingest
+package ingest_test
 
 import (
 	"encoding/json"
 	"strings"
 	"testing"
 
+	"ai.native.workflow/internal/ingest"
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -62,7 +63,7 @@ not-json
 			wantInvalid: []string{
 				"not-json",
 			},
-			wantErr: false, // ingestion should not fail on invalid lines
+			wantErr: false,
 		},
 		{
 			name: "all invalid lines",
@@ -112,8 +113,9 @@ still bad
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			valid, invalid, err := ReadNDJSON(strings.NewReader(tt.input))
+			valid, invalid, err := ingest.ReadNDJSON(strings.NewReader(tt.input))
 
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("unexpected error state: got err=%v wantErr=%v", err, tt.wantErr)

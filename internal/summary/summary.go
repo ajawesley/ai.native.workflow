@@ -7,11 +7,9 @@ type Result struct {
 	TotalInvalid int `json:"total_invalid"`
 }
 
-func Compute(events []json.RawMessage) Result {
-	if events == nil {
-		return Result{}
-	}
+func Compute(valid []json.RawMessage, invalidCount int) Result {
 	return Result{
-		TotalValid: len(events),
+		TotalValid:   len(valid),
+		TotalInvalid: invalidCount,
 	}
 }

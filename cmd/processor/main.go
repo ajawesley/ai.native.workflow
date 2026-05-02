@@ -37,14 +37,14 @@ func main() {
 			filepath.Dir(inputPath),
 			"invalid_events.jsonl",
 		)
-		if err := writeNDJSON(invalidPath, invalidEvents); err != nil {
+		if err := writeInvalidLines(invalidPath, invalidEvents); err != nil {
 			log.Fatalf("write invalid events: %v", err)
 		}
 		fmt.Fprintf(os.Stderr, "wrote %d invalid event(s) to %s\n", len(invalidEvents), invalidPath)
 	}
 
 	// --- compute + print summary ---
-	result := summary.Compute(validEvents)
+	result := summary.Compute(validEvents, len(invalidEvents))
 
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
@@ -53,8 +53,8 @@ func main() {
 	}
 }
 
-// writeNDJSON writes each entry as a newline-delimited JSON record.
-func writeNDJSON(path string, records []json.RawMessage) error {
+// writeInvalidLines writes each invalid line as-is to a .jsonl file.
+func writeInvalidLines(path string, lines []string) error {
 	f, err := os.Create(path)
 	if err != nil {
 		return err
@@ -62,8 +62,8 @@ func writeNDJSON(path string, records []json.RawMessage) error {
 	defer f.Close()
 
 	w := bufio.NewWriter(f)
-	for _, r := range records {
-		if _, err := w.Write(r); err != nil {
+	for _, line := range lines {
+		if _, err := w.WriteString(line); err != nil {
 			return err
 		}
 		if err := w.WriteByte('\n'); err != nil {

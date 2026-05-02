@@ -9,12 +9,12 @@ import (
 	"ai.native.workflow/internal/events"
 )
 
-func ReadNDJSON(r io.Reader) ([]json.RawMessage, []json.RawMessage, error) {
+func ReadNDJSON(r io.Reader) ([]json.RawMessage, []string, error) {
 	scanner := bufio.NewScanner(r)
 
 	var (
 		valid   []json.RawMessage
-		invalid []json.RawMessage
+		invalid []string
 	)
 
 	for scanner.Scan() {
@@ -29,9 +29,9 @@ func ReadNDJSON(r io.Reader) ([]json.RawMessage, []json.RawMessage, error) {
 		raw := make([]byte, len(line))
 		copy(raw, line)
 
-		// Validate by unmarshaling into events.Event
+		// Validate using domain-level validation
 		if err := events.Validate(raw); err != nil {
-			invalid = append(invalid, json.RawMessage(raw))
+			invalid = append(invalid, string(raw))
 			continue
 		}
 

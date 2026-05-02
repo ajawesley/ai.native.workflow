@@ -3,74 +3,90 @@ package summary_test
 import (
 	"encoding/json"
 	"testing"
-	"time"
 
 	"ai.native.workflow/internal/summary"
+	"github.com/google/go-cmp/cmp"
 )
 
-func makeRaw(t *testing.T, v any) json.RawMessage {
-	t.Helper()
-	b, err := json.Marshal(v)
-	if err != nil {
-		t.Fatalf("makeRaw: %v", err)
-	}
-	return json.RawMessage(b)
-}
-
-type eventPayload struct {
-	ID        string    `json:"id"`
-	Type      string    `json:"type"`
-	Amount    float64   `json:"amount"`
-	Timestamp time.Time `json:"timestamp"`
-}
-
 func TestCompute(t *testing.T) {
-	now := time.Now()
-
 	tests := []struct {
-		name      string
-		events    []json.RawMessage
-		wantValid int
+		name         string
+		valid        []json.RawMessage
+		invalidCount int
+		want         summary.Result
 	}{
 		{
-			name:      "happy path",
-			wantValid: 2,
-			events: []json.RawMessage{
-				makeRaw(t, eventPayload{ID: "1", Type: "credit", Amount: 100, Timestamp: now}),
-				makeRaw(t, eventPayload{ID: "2", Type: "debit", Amount: 40, Timestamp: now}),
+			name:         "nil valid slice",
+			valid:        nil,
+			invalidCount: 0,
+			want: summary.Result{
+				TotalValid:   0,
+				TotalInvalid: 0,
 			},
 		},
 		{
-			name:      "empty slice",
-			wantValid: 0,
-			events:    []json.RawMessage{},
+			name:         "empty valid slice",
+			valid:        []json.RawMessage{},
+			invalidCount: 0,
+			want: summary.Result{
+				TotalValid:   0,
+				TotalInvalid: 0,
+			},
 		},
 		{
-			name:      "nil slice",
-			wantValid: 0,
-			events:    nil,
+			name: "one valid event",
+			valid: []json.RawMessage{
+				json.RawMessage(`{"id":1}`),
+			},
+			invalidCount: 0,
+			want: summary.Result{
+				TotalValid:   1,
+				TotalInvalid: 0,
+			},
 		},
 		{
-			name:      "mixed credit/debit",
-			wantValid: 3,
-			events: []json.RawMessage{
-				makeRaw(t, eventPayload{ID: "c1", Type: "credit", Amount: 200, Timestamp: now}),
-				makeRaw(t, eventPayload{ID: "c2", Type: "credit", Amount: 50, Timestamp: now}),
-				makeRaw(t, eventPayload{ID: "d1", Type: "debit", Amount: 75, Timestamp: now}),
+			name: "multiple valid events",
+			valid: []json.RawMessage{
+				json.RawMessage(`{"id":1}`),
+				json.RawMessage(`{"id":2}`),
+				json.RawMessage(`{"id":3}`),
+			},
+			invalidCount: 0,
+			want: summary.Result{
+				TotalValid:   3,
+				TotalInvalid: 0,
+			},
+		},
+		{
+			name:         "invalid only",
+			valid:        nil,
+			invalidCount: 5,
+			want: summary.Result{
+				TotalValid:   0,
+				TotalInvalid: 5,
+			},
+		},
+		{
+			name: "mixed valid + invalid",
+			valid: []json.RawMessage{
+				json.RawMessage(`{"id":1}`),
+				json.RawMessage(`{"id":2}`),
+			},
+			invalidCount: 3,
+			want: summary.Result{
+				TotalValid:   2,
+				TotalInvalid: 3,
 			},
 		},
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			got := summary.Compute(tt.events)
+			got := summary.Compute(tt.valid, tt.invalidCount)
 
-			if got.TotalValid != tt.wantValid {
-				t.Errorf("TotalValid: want %d, got %d", tt.wantValid, got.TotalValid)
-			}
-
-			if got.TotalInvalid != 0 {
-				t.Errorf("TotalInvalid: want 0, got %d", got.TotalInvalid)
+			if diff := cmp.Diff(got, tt.want); diff != "" {
+				t.Fatalf("summary mismatch (-got +want):\n%s", diff)
 			}
 		})
 	}
