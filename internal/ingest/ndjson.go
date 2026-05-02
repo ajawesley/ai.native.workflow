@@ -5,8 +5,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-
-	"ai.native.workflow/internal/events"
 )
 
 func ReadNDJSON(r io.Reader) ([]json.RawMessage, []string, error) {
@@ -29,12 +27,20 @@ func ReadNDJSON(r io.Reader) ([]json.RawMessage, []string, error) {
 		raw := make([]byte, len(line))
 		copy(raw, line)
 
-		// Validate using domain-level validation
-		if err := events.Validate(raw); err != nil {
+		// JSON syntax validation
+		var tmp interface{}
+		if err := json.Unmarshal(raw, &tmp); err != nil {
 			invalid = append(invalid, string(raw))
 			continue
 		}
 
+		// Require JSON object only
+		if _, ok := tmp.(map[string]interface{}); !ok {
+			invalid = append(invalid, string(raw))
+			continue
+		}
+
+		// Valid JSON object → keep raw message
 		valid = append(valid, json.RawMessage(raw))
 	}
 
