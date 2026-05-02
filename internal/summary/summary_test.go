@@ -8,7 +8,6 @@ import (
 	"ai.native.workflow/internal/summary"
 )
 
-// makeRaw marshals v into a json.RawMessage or fails the test.
 func makeRaw(t *testing.T, v any) json.RawMessage {
 	t.Helper()
 	b, err := json.Marshal(v)
@@ -18,7 +17,6 @@ func makeRaw(t *testing.T, v any) json.RawMessage {
 	return json.RawMessage(b)
 }
 
-// eventPayload mirrors the event shape for test isolation.
 type eventPayload struct {
 	ID        string    `json:"id"`
 	Type      string    `json:"type"`
@@ -26,61 +24,54 @@ type eventPayload struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
-func TestCompute_HappyPath(t *testing.T) {
+func TestCompute(t *testing.T) {
 	now := time.Now()
 
-	events := []json.RawMessage{
-		makeRaw(t, eventPayload{ID: "1", Type: "credit", Amount: 100.00, Timestamp: now}),
-		makeRaw(t, eventPayload{ID: "2", Type: "debit", Amount: 40.00, Timestamp: now}),
+	tests := []struct {
+		name      string
+		events    []json.RawMessage
+		wantValid int
+	}{
+		{
+			name:      "happy path",
+			wantValid: 2,
+			events: []json.RawMessage{
+				makeRaw(t, eventPayload{ID: "1", Type: "credit", Amount: 100, Timestamp: now}),
+				makeRaw(t, eventPayload{ID: "2", Type: "debit", Amount: 40, Timestamp: now}),
+			},
+		},
+		{
+			name:      "empty slice",
+			wantValid: 0,
+			events:    []json.RawMessage{},
+		},
+		{
+			name:      "nil slice",
+			wantValid: 0,
+			events:    nil,
+		},
+		{
+			name:      "mixed credit/debit",
+			wantValid: 3,
+			events: []json.RawMessage{
+				makeRaw(t, eventPayload{ID: "c1", Type: "credit", Amount: 200, Timestamp: now}),
+				makeRaw(t, eventPayload{ID: "c2", Type: "credit", Amount: 50, Timestamp: now}),
+				makeRaw(t, eventPayload{ID: "d1", Type: "debit", Amount: 75, Timestamp: now}),
+			},
+		},
 	}
 
-	got := summary.Compute(events)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := summary.Compute(tt.events)
 
-	if got.TotalValid != 2 {
-		t.Errorf("TotalValid: want 2, got %d", got.TotalValid)
-	}
-	if got.TotalInvalid != 0 {
-		t.Errorf("TotalInvalid: want 0, got %d", got.TotalInvalid)
-	}
-}
+			if got.TotalValid != tt.wantValid {
+				t.Errorf("TotalValid: want %d, got %d", tt.wantValid, got.TotalValid)
+			}
 
-func TestCompute_EmptyInput(t *testing.T) {
-	got := summary.Compute([]json.RawMessage{})
-
-	if got.TotalValid != 0 {
-		t.Errorf("TotalValid: want 0, got %d", got.TotalValid)
-	}
-	if got.TotalInvalid != 0 {
-		t.Errorf("TotalInvalid: want 0, got %d", got.TotalInvalid)
-	}
-}
-
-func TestCompute_NilInput(t *testing.T) {
-	got := summary.Compute(nil)
-
-	if got.TotalValid != 0 {
-		t.Errorf("TotalValid: want 0, got %d", got.TotalValid)
-	}
-	if got.TotalInvalid != 0 {
-		t.Errorf("TotalInvalid: want 0, got %d", got.TotalInvalid)
-	}
-}
-
-func TestCompute_MixedCreditDebit(t *testing.T) {
-	now := time.Now()
-
-	events := []json.RawMessage{
-		makeRaw(t, eventPayload{ID: "c1", Type: "credit", Amount: 200.00, Timestamp: now}),
-		makeRaw(t, eventPayload{ID: "c2", Type: "credit", Amount: 50.00, Timestamp: now}),
-		makeRaw(t, eventPayload{ID: "d1", Type: "debit", Amount: 75.00, Timestamp: now}),
-	}
-
-	got := summary.Compute(events)
-
-	if got.TotalValid != 3 {
-		t.Errorf("TotalValid: want 3, got %d", got.TotalValid)
-	}
-	if got.TotalInvalid != 0 {
-		t.Errorf("TotalInvalid: want 0, got %d", got.TotalInvalid)
+			if got.TotalInvalid != 0 {
+				t.Errorf("TotalInvalid: want 0, got %d", got.TotalInvalid)
+			}
+		})
 	}
 }
