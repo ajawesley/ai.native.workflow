@@ -18,8 +18,7 @@ func makeRaw(t *testing.T, v any) json.RawMessage {
 	return json.RawMessage(b)
 }
 
-// eventPayload is a local mirror of the event shape — keeps the test
-// package decoupled from the events package while staying type-safe.
+// eventPayload mirrors the event shape for test isolation.
 type eventPayload struct {
 	ID        string    `json:"id"`
 	Type      string    `json:"type"`
