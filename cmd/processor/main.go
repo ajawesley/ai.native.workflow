@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"ai.native.workflow/internal/events"
+	"ai.native.workflow/internal/ingest"
 	"ai.native.workflow/internal/summary"
 )
 
@@ -25,36 +25,10 @@ func main() {
 	}
 	defer f.Close()
 
-	var (
-		validEvents   []json.RawMessage
-		invalidEvents []json.RawMessage
-	)
-
-	scanner := bufio.NewScanner(f)
-	lineNum := 0
-
-	for scanner.Scan() {
-		lineNum++
-		line := scanner.Bytes()
-
-		if len(line) == 0 {
-			continue // skip blank lines
-		}
-
-		// Defensive copy — scanner reuses its buffer.
-		raw := make([]byte, len(line))
-		copy(raw, line)
-
-		if err := events.Validate(raw); err != nil {
-			invalidEvents = append(invalidEvents, raw)
-			continue
-		}
-
-		validEvents = append(validEvents, raw)
-	}
-
-	if err := scanner.Err(); err != nil {
-		log.Fatalf("scan input: %v", err)
+	// --- NDJSON ingestion ---
+	validEvents, invalidEvents, err := ingest.ReadNDJSON(f)
+	if err != nil {
+		log.Fatalf("ingest: %v", err)
 	}
 
 	// --- write invalid events ---
