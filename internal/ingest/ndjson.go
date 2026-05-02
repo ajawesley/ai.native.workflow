@@ -4,45 +4,42 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 
 	"ai.native.workflow/internal/events"
 )
 
-// ReadNDJSON reads newline-delimited JSON from r and returns validated events
-// alongside the raw bytes of any line that failed unmarshal or validation.
-// I/O failures are returned as a non-nil error; per-line errors are not.
-func ReadNDJSON(r io.Reader) (valid []events.Event, invalid []json.RawMessage, err error) {
+func ReadNDJSON(r io.Reader) ([]json.RawMessage, []json.RawMessage, error) {
 	scanner := bufio.NewScanner(r)
+
+	var (
+		valid   []json.RawMessage
+		invalid []json.RawMessage
+	)
 
 	for scanner.Scan() {
 		line := scanner.Bytes()
 
+		// Skip blank or whitespace-only lines
 		if len(bytes.TrimSpace(line)) == 0 {
-			continue // blank / whitespace-only — skip silently
+			continue
 		}
 
-		// Defensive copy: scanner reuses its buffer on every Scan call.
+		// Defensive copy — scanner buffer is reused
 		raw := make([]byte, len(line))
 		copy(raw, line)
 
-		var e events.Event
-		if err := json.Unmarshal(raw, &e); err != nil {
-			invalid = append(invalid, raw)
-			continue
-		}
-
+		// Validate by unmarshaling into events.Event
 		if err := events.Validate(raw); err != nil {
-			invalid = append(invalid, raw)
+			invalid = append(invalid, json.RawMessage(raw))
 			continue
 		}
 
-		valid = append(valid, e)
+		valid = append(valid, json.RawMessage(raw))
 	}
 
 	if err := scanner.Err(); err != nil {
-		return nil, nil, fmt.Errorf("ingest: read error: %w", err)
+		return nil, nil, err
 	}
 
 	return valid, invalid, nil
